@@ -1,15 +1,38 @@
-use std::io::Cursor;
+use std::{io::Cursor, fmt::Display};
 use chrono::Local;
-use crate::ErrorCode;
+// use crate::ErrorCode;
 use image::{ImageResult, DynamicImage};
 use wasm_bindgen::prelude::*;
 use log::*;
+use super::{ErrorCode, ImageProcessingResult};
 
+pub trait InputType {
+    fn to_byte(&self) -> Result<Vec<u8>, ErrorCode>;
+}
+impl InputType for String {
+    fn to_byte(&self) -> Result<Vec<u8>, ErrorCode> {
+        match base64::decode(ImageProcess::parse_base64_input_if_needed(&self)) {
+            Ok(img_bytes) => {
+                info!("Convert Vec<u8> byte from base64 image");
+                return Ok(img_bytes);
+            },
+            Err(e) => {
+                error!("Failed base64::decode() : {}", e);
+                return Err(ErrorCode::UnableToDecode)
+            }
+        }
+    }
+}
+impl InputType for Vec<u8> {
+    fn to_byte(&self) -> Result<Vec<u8>, ErrorCode> {
+        Ok(self.to_vec())
+    }
+}
 
 #[derive(Debug)]
-pub struct ImageProcess {
-    pub base64_input: String,
-    pub base64_output: Option<String>,
+pub struct ImageProcess
+{
+    pub input: Vec<u8>,
     pub filter_params: ImageParameters
 }
 
@@ -21,6 +44,14 @@ pub struct ImageParameters {
     pub hue: Option<i32>,
     pub grayscale: Option<bool>,
     pub constrast: Option<f32>
+}
+
+#[wasm_bindgen]
+impl ImageParameters {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> ImageParameters {
+        ImageParameters::default()
+    }
 }
 
 impl ImageParameters {
@@ -50,9 +81,11 @@ impl ImageParameters {
             info!("Huerotate filter applied : {}", hue);
         }
 
-        if let Some(_) = self.grayscale {
-            img = img.grayscale();
-            info!("Grayscale filter applied");
+        if let Some(b) = self.grayscale {
+            if b {
+                img = img.grayscale();
+                info!("Grayscale filter applied");
+            }
         }
 
         if let Some(constrast) = self.constrast {
@@ -65,11 +98,12 @@ impl ImageParameters {
 }
 
 impl ImageProcess {
-    pub fn new(base64_input: String, filter: Option<ImageParameters>) -> ImageProcess {
+    pub fn new<T>(input: T, filter: Option<ImageParameters>) -> Result<ImageProcess, ErrorCode>
+        where T : InputType
+    {
         info!("New ImageProcess instance");
-        ImageProcess {
-            base64_input: ImageProcess::parse_base64_input_if_needed(base64_input),
-            base64_output: None,
+        Ok(ImageProcess {
+            input: input.to_byte()?,
             filter_params : match filter {
                 Some(filter) => {
                     info!("Filters parameter set");
@@ -80,54 +114,24 @@ impl ImageProcess {
                     ImageParameters::default()
                 }
             }
-        }
+        })
     }
 
-    pub fn parse_base64_input_if_needed(base64_input : String) -> String {
+    //Replace the "data:image/jpeg;base64," in the string
+    pub fn parse_base64_input_if_needed(base64_input : &String) -> String {
         str::replace(base64_input.as_str(), "data:image/jpeg;base64,", "")
     }
 
-    // pub fn base64_input(&self) -> &String {
-    //     &self.base64_input
-    // }
-
-    // pub fn base64_output(&self) -> Option<&String> {
-    //     self.base64_output.as_ref()
-    // }
-
-    pub fn update_output(&mut self, output : &str) {
-        self.base64_output = Some(String::from(output));
+    //Create a Dynamic image from base64
+    pub fn get_image(base64: &str) -> ImageResult<DynamicImage> {
+        let img_bytes = base64::decode(base64).unwrap();
+        image::load_from_memory(&img_bytes.as_slice())
     }
 
-    pub fn image_output(&self) -> Option<ImageResult<DynamicImage>> {
-        match &self.base64_output {
-            Some(base64_output_ok) => {
-                let img_bytes = base64::decode(base64_output_ok).unwrap();
-                let image_loaded_result = image::load_from_memory(&img_bytes.as_slice());
-
-                Some(image_loaded_result)
-            },
-            None => None
-        }
-    }
-
-    pub fn compute_image_processing(&self) -> Result<String, ErrorCode> {
-        //Decode the base64 image and get list of byte
-        info!("compute_image_processing()");
-        let img_bytes = match base64::decode(&self.base64_input) {
-            Ok(img_bytes) => {
-                info!("Convert Vec<u8> byte from base64 image");
-                img_bytes
-            },
-            Err(e) => {
-                error!("Failed base64::decode() : {}", e);
-                return Err(ErrorCode::InvalidParsing)
-            }
-        };
-
+    pub fn compute_image_processing(&self) -> Result<ImageProcessingResult, ErrorCode> {
         //Load image from byte
         info!("Try to create Dynamic image from byte");
-        let mut img = image::load_from_memory(&img_bytes.as_slice()).unwrap();
+        let mut img = image::load_from_memory(&self.input.as_slice()).unwrap();
         info!("Dynamic image instance created");
 
         img = self.filter_params.apply_filter(img.clone());
@@ -136,39 +140,15 @@ impl ImageProcess {
         let mut edited_image_bytes = Vec::new();
         img.write_to(&mut Cursor::new(&mut edited_image_bytes), image::ImageOutputFormat::Png).unwrap();
 
-        info!("Encode bytes filtered image to base64");
-        Ok(base64::encode(&edited_image_bytes))
+        Ok(ImageProcessingResult::new(edited_image_bytes))
     }
 
-    pub fn compute_image_processing_buf(&self) -> Result<Vec<u8>, ErrorCode> {
-        //Decode the base64 image and get list of byte
-        info!("compute_image_processing()");
-        let img_bytes = match base64::decode(&self.base64_input) {
-            Ok(img_bytes) => {
-                info!("Convert Vec<u8> byte from base64 image");
-                img_bytes
-            },
-            Err(e) => {
-                error!("Failed base64::decode() : {}", e);
-                return Err(ErrorCode::InvalidParsing)
-            }
-        };
+    // pub fn compute_image_processing_as_base64(&self) -> Result<String, ErrorCode> {
+    //     let filter_image_bytes = self.compute_image_processing_as_byte()?;
 
-        //Load image from byte
-        info!("Try to create Dynamic image from byte");
-        let mut img = image::load_from_memory(&img_bytes.as_slice()).unwrap();
-        info!("Dynamic image instance created");
-
-        img = self.filter_params.apply_filter(img.clone());
-
-        info!("Convert filtered image to bytes");
-        let mut edited_image_bytes = Vec::new();
-        img.write_to(&mut Cursor::new(&mut edited_image_bytes), image::ImageOutputFormat::Png).unwrap();
-
-        Ok(edited_image_bytes)
-        // info!("Encode bytes filtered image to base64");
-        // Ok(base64::encode(&edited_image_bytes))
-    }
+    //     info!("Encode bytes filtered image to base64");
+    //     Ok(base64::encode(&filter_image_bytes))
+    // }
 
     pub fn save_image(img: &DynamicImage, path: &str) -> Option<ErrorCode> {
         let local_date = Local::now();
@@ -181,5 +161,11 @@ impl ImageProcess {
             return Some(ErrorCode::UnableToSave);
         }
         None
+    }
+}
+
+impl Display for ImageProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", base64::encode(&self.input))
     }
 }

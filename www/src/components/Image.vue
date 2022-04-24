@@ -17,22 +17,6 @@
 
     await init();
 
-    // const base64_arraybuffer = async (data) => {
-    // // Use a FileReader to generate a base64 data URI
-    //     const base64url = await new Promise((r) => {
-    //         const reader = new FileReader()
-    //         reader.onload = () => r(reader.result)
-    //         reader.readAsDataURL(new Blob([data]))
-    //     })
-
-    //     /*
-    //     The result looks like
-    //     "data:application/octet-stream;base64,<your base64 data>",
-    //     so we split off the beginning:
-    //     */
-    //     return base64url.split(",", 2)[1]
-    // }
-
     export default {
         data() {
             return {
@@ -61,12 +45,32 @@
             },
             async onImageUploaded() {
                 // this.imageEdit = img.test(this.image);
+                try {
+                    let x = img.throw_error();
+                } catch(error) {
+                    console.log("Error received from Rust : " + error)
+                }
+
+
                 // this.imageEdit = img.perform_processing(this.image);
-                let array = img.perform_processing(this.image);
-                console.log(array);
-                var b64 = await FromByteArrayToBase64(array);
-                console.log(b64);
-                this.imageEdit = "data:image/jpeg;base64," + b64;
+                try {
+                    let params = new img.ImageParameters();
+                    params.brighten = 10;
+                    params.blur = 0;
+                    params.hue = 100;
+                    params.grayscale = true;
+                    params.constrast = 0;
+                    // let params = img.ImageParameters().new_img_params(0, 0.0, 0, false, 0.0);
+                    let image_result = img.perform_processing(this.image, params);
+                    this.imageEdit = "data:image/jpeg;base64," + image_result.to_base64();
+                } catch(error) {
+                    console.log(error)
+                }
+                // console.log(array);
+                // var b64 = img.b(array);
+                // var b64 = await FromByteArrayToBase64(array);
+                // console.log(b64);
+                // this.imageEdit = "data:image/jpeg;base64," + b64;
             }
         }
     }
