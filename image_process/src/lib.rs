@@ -23,22 +23,11 @@ cfg_if! {
 #[wasm_bindgen(start)]
 pub fn main() {
     init_log();
-    info!("Console log initialized");
+    info!("Rust logs initialized");
 
     //Panic display in the console
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
-
-#[wasm_bindgen]
-pub fn throw_error() -> Result<Vec<u8>, JsError> {
-    Err(JsError::new("Unable to zob"))
-}
-
-#[wasm_bindgen]
-pub fn b(v: Vec<u8>) -> String {
-    base64::encode(&v)
-}
-
 
 #[wasm_bindgen(js_name = perform_processing)]
 pub fn perform_processing(base64_input: String, filter: Option<ImageParameters>) -> Result<ImageProcessingResult, JsError> {
