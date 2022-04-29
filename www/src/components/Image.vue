@@ -110,8 +110,12 @@
           </div>
         </div>
       </div>
+    
     </div>
     
+    <div class="ml-2">
+      <img style="" :src="imageTest" alt="" />
+    </div>
   </div>
 </template>
 
@@ -128,6 +132,7 @@ export default {
       processing: false,
       image: null,
       imageEdit: null,
+      imageTest: null
     };
   },
   methods: {
@@ -153,6 +158,9 @@ export default {
       reader.onload = (e) => {
         this.image = e.target.result;
         this.onParamsChanged(null);
+
+        let imageTest = img.filter_gradient(this.image);
+        this.imageTest = "data:image/jpeg;base64," + imageTest.to_base64();;
       };
 
       reader.readAsDataURL(fileObject);

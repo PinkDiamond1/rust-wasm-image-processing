@@ -1,11 +1,12 @@
-use std::{panic, io::Error};
-
-use engine::{ImageProcess, ImageParameters, ErrorCode};
-use wasm_bindgen::prelude::*;
-use log::*;
+use crate::engine::{image_filters::FilterType as EngineFilterType, ImageProcessingResult};
 use cfg_if::cfg_if;
-
-use crate::engine::ImageProcessingResult;
+use engine::image_filters::{self, GradientDirection};
+use engine::{image_filters::ColorRgba, ImageParameters, ImageProcess};
+use image::Rgba;
+use image::{DynamicImage, GrayImage, Pixel};
+use log::*;
+use std::panic;
+use wasm_bindgen::prelude::*;
 
 pub mod engine;
 
@@ -29,41 +30,88 @@ pub fn main() {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
 }
 
-#[wasm_bindgen(js_name = perform_processing)]
-pub fn perform_processing(base64_input: String, filter: Option<ImageParameters>) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, filter)?; //perform_processing(base64_input, filter);
+#[wasm_bindgen]
+pub fn perform_processing(
+    base64_input: String,
+    filter: Option<ImageParameters>,
+) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input, filter)?;
 
     match image_processing.compute_image_processing() {
         Ok(res) => Ok(res),
-        Err(e) => Err(JsError::new(e.message()))
+        Err(e) => Err(JsError::new(e.message())),
     }
 }
 
-// #[wasm_bindgen(js_name = performProcessingGetAsBase64)]
-// pub fn perform_processing_as_base_64(base64_input: String, filter: Option<ImageParameters>) -> Result<String, JsError> {
-//     let image_processing = ImageProcess::new(base64_input, filter)?; //perform_processing(base64_input, filter);
+#[wasm_bindgen]
+pub fn perform_filter(
+    base64_input: String,
+    filter: EngineFilterType,
+) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input, None).unwrap();
 
-//     match image_processing.compute_image_processing_as_base64() {
-//         Ok(res) => Ok(res),
-//         Err(e) => Err(JsError::new(e.message()))
-//     }
-// }
+    let img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+    let gray_image: GrayImage = img.to_luma8();
 
-// fn perform_processing(base64_input: String, filter: Option<ImageParameters>) -> Result<ImageProcess, ErrorCode>  {
-//     info!("Call perform processing");
-//     let image_processing = ImageProcess::new(base64_input, filter);
-//     info!("Input : {}", image_processing.input);
+    // let contours = imageproc::contours::find_contours(&gray_image);
+    let sobel = imageproc::gradients::sobel_gradients(&gray_image);
+    // let prewitt = imageproc::gradients::prewitt_gradients(&gray_image);
+    // let x: ImageBuffer<Luma<u16>, Vec<u16>> = prewitt.convert();
+    let sobel_image = DynamicImage::from(sobel);
 
-//     image_processing
-// }
+    Ok(ImageProcessingResult::new(
+        ImageProcess::dynamic_image_to_byte(&sobel_image),
+    ))
+}
 
 #[wasm_bindgen]
-pub fn test(base64_img: String) {
-    info!("base64_img = {}", &base64_img[0..40]);
-    let parsed_base64_img = ImageProcess::parse_base64_input_if_needed(&base64_img);
-    info!("parsed_base64_img = {}", &parsed_base64_img[0..40]);
-    let img_bytes = base64::decode(&parsed_base64_img).unwrap();
-    info!("img_bytes = {:?}", img_bytes);
-    let img = image::load_from_memory(&img_bytes.as_slice()).unwrap();
-    info!("ok dynamic image = {:?}", img);
+pub fn filter_col_color(base64_input: String) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+
+    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+
+    let colors = vec![
+        ColorRgba::new(214, 110, 250, 150),
+        ColorRgba::new(155, 100, 220, 150),
+        ColorRgba::new(150, 120, 240, 150),
+        ColorRgba::new(95, 105, 220, 150),
+        ColorRgba::new(110, 150, 250, 160),
+    ];
+
+    image_filters::filter_col_color(&mut img, colors.iter().map(|c| Rgba::<u8>::from(*c)).collect()).unwrap();
+
+    Ok(ImageProcessingResult::new(
+        ImageProcess::dynamic_image_to_byte(&img),
+    ))
+}
+
+#[wasm_bindgen]
+pub fn filter_vertical(base64_input: String) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+
+    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+
+    image_filters::filter_diag(&mut img);
+
+    Ok(ImageProcessingResult::new(
+        ImageProcess::dynamic_image_to_byte(&img),
+    ))
+}
+
+#[wasm_bindgen]
+pub fn filter_gradient(base64_input: String) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+
+    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+    
+    image_filters::filter_gradient(
+        &mut img,
+        ColorRgba::new(0, 128, 0, 0).into(),
+        ColorRgba::new(255, 255, 255, 255).into(),
+        GradientDirection::VERTICAL,
+    );
+
+    Ok(ImageProcessingResult::new(
+        ImageProcess::dynamic_image_to_byte(&img),
+    ))
 }

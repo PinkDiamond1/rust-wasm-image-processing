@@ -1,6 +1,5 @@
 use std::{io::Cursor, fmt::Display};
 use chrono::Local;
-// use crate::ErrorCode;
 use image::{ImageResult, DynamicImage};
 use wasm_bindgen::prelude::*;
 use log::*;
@@ -38,13 +37,14 @@ pub struct ImageProcess
 
 #[wasm_bindgen]
 #[derive(Debug)]
-pub struct ImageParameters {
+pub struct ImageParameters { //add colorops::invert, colorops::BiLevel, colorops::index_colors, https://docs.rs/image/latest/image/imageops/enum.FilterType.html
     pub brighten: Option<i32>,
     pub blur: Option<f32>,
     pub hue: Option<i32>,
     pub grayscale: Option<bool>,
     pub constrast: Option<f32>
 }
+//ImageBuffer
 
 #[wasm_bindgen]
 impl ImageParameters {
@@ -136,19 +136,16 @@ impl ImageProcess {
 
         img = self.filter_params.apply_filter(img.clone());
 
-        info!("Convert filtered image to bytes");
+        Ok(ImageProcessingResult::new(ImageProcess::dynamic_image_to_byte(&img)))
+    }
+
+    pub fn dynamic_image_to_byte(img: &DynamicImage) -> Vec<u8> {
+        info!("Convert image to bytes");
         let mut edited_image_bytes = Vec::new();
         img.write_to(&mut Cursor::new(&mut edited_image_bytes), image::ImageOutputFormat::Png).unwrap();
 
-        Ok(ImageProcessingResult::new(edited_image_bytes))
+        edited_image_bytes
     }
-
-    // pub fn compute_image_processing_as_base64(&self) -> Result<String, ErrorCode> {
-    //     let filter_image_bytes = self.compute_image_processing_as_byte()?;
-
-    //     info!("Encode bytes filtered image to base64");
-    //     Ok(base64::encode(&filter_image_bytes))
-    // }
 
     pub fn save_image(img: &DynamicImage, path: &str) -> Option<ErrorCode> {
         let local_date = Local::now();
