@@ -8,16 +8,19 @@ pub enum ErrorCode {
     UnableToDecode,
     InvalidParsing,
     UnableToSave,
-    NoColorInput
+    NoColorInput,
+    NotImplemented
 }
 
 impl ErrorCode {
+    //Message to be display in the front end
     pub fn message(&self) -> &str {
         match self {
             Self::InvalidParsing => "Invalid parsing",
             Self::UnableToDecode => "Unable to decode",
             Self::UnableToSave => "Unable to save",
             Self::NoColorInput => "No color to apply for filter",
+            Self::NotImplemented => "Not implemented yet",
         }
     }
 }

@@ -159,7 +159,7 @@ export default {
         this.image = e.target.result;
         this.onParamsChanged(null);
 
-        let imageTest = img.filter_gradient(this.image);
+        let imageTest = img.filter_vertical(this.image);
         this.imageTest = "data:image/jpeg;base64," + imageTest.to_base64();;
       };
 

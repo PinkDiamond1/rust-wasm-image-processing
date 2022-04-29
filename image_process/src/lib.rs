@@ -1,6 +1,6 @@
-use crate::engine::{image_filters::FilterType as EngineFilterType, ImageProcessingResult};
+use crate::engine::ImageProcessingResult;
 use cfg_if::cfg_if;
-use engine::image_filters::{self, GradientDirection};
+use engine::image_filters::GradientDirection;
 use engine::{image_filters::ColorRgba, ImageParameters, ImageProcess};
 use image::Rgba;
 use image::{DynamicImage, GrayImage, Pixel};
@@ -31,87 +31,95 @@ pub fn main() {
 }
 
 #[wasm_bindgen]
-pub fn perform_processing(
+pub fn filter_params(
     base64_input: String,
-    filter: Option<ImageParameters>,
+    params: Option<ImageParameters>,
 ) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, filter)?;
-
-    match image_processing.compute_image_processing() {
-        Ok(res) => Ok(res),
-        Err(e) => Err(JsError::new(e.message())),
-    }
+    let image_processing = ImageProcess::new(base64_input)?;
+    image_processing
+        .compute_parameters(params.unwrap_or(ImageParameters::default()))
+        .map_err(|e| JsError::new(e.message()))
 }
 
 #[wasm_bindgen]
-pub fn perform_filter(
-    base64_input: String,
-    filter: EngineFilterType,
-) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, None).unwrap();
-
-    let img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
-    let gray_image: GrayImage = img.to_luma8();
-
-    // let contours = imageproc::contours::find_contours(&gray_image);
-    let sobel = imageproc::gradients::sobel_gradients(&gray_image);
-    // let prewitt = imageproc::gradients::prewitt_gradients(&gray_image);
-    // let x: ImageBuffer<Luma<u16>, Vec<u16>> = prewitt.convert();
-    let sobel_image = DynamicImage::from(sobel);
-
-    Ok(ImageProcessingResult::new(
-        ImageProcess::dynamic_image_to_byte(&sobel_image),
-    ))
+pub fn filter_sobel(base64_input: String) -> Result<ImageProcessingResult, JsError> {
+    ImageProcess::new(base64_input)?
+        .compute_filter_sobel()
+        .map_err(|e| JsError::new(e.message()))
 }
 
 #[wasm_bindgen]
-pub fn filter_col_color(base64_input: String) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+pub fn filter_column_color(base64_input: String) -> Result<ImageProcessingResult, JsError> {
+    ImageProcess::new(base64_input)?
+        .compute_filter_column_color(vec![
+            ColorRgba::new(214, 110, 250, 150),
+            ColorRgba::new(155, 100, 220, 150),
+            ColorRgba::new(150, 120, 240, 150),
+            ColorRgba::new(95, 105, 220, 150),
+            ColorRgba::new(110, 150, 250, 160),
+        ])
+        .map_err(|e| JsError::new(e.message()))
 
-    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+    // let image_processing = ImageProcess::new(base64_input, None).unwrap();
 
-    let colors = vec![
-        ColorRgba::new(214, 110, 250, 150),
-        ColorRgba::new(155, 100, 220, 150),
-        ColorRgba::new(150, 120, 240, 150),
-        ColorRgba::new(95, 105, 220, 150),
-        ColorRgba::new(110, 150, 250, 160),
-    ];
+    // let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
 
-    image_filters::filter_col_color(&mut img, colors.iter().map(|c| Rgba::<u8>::from(*c)).collect()).unwrap();
+    // let colors = vec![
+    //     ColorRgba::new(214, 110, 250, 150),
+    //     ColorRgba::new(155, 100, 220, 150),
+    //     ColorRgba::new(150, 120, 240, 150),
+    //     ColorRgba::new(95, 105, 220, 150),
+    //     ColorRgba::new(110, 150, 250, 160),
+    // ];
 
-    Ok(ImageProcessingResult::new(
-        ImageProcess::dynamic_image_to_byte(&img),
-    ))
+    // image_filters::filter_col_color(
+    //     &mut img,
+    //     colors.iter().map(|c| Rgba::<u8>::from(*c)).collect(),
+    // )
+    // .unwrap();
+
+    // Ok(ImageProcessingResult::new(
+    //     ImageProcess::dynamic_image_to_byte(&img),
+    // ))
 }
 
 #[wasm_bindgen]
-pub fn filter_vertical(base64_input: String) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+pub fn filter_pixel(base64_input: String, pixel_type: engine::image_filters::FilterPixelType) -> Result<ImageProcessingResult, JsError> {
+    ImageProcess::new(base64_input)?
+        .compute_filter_pixel(pixel_type)
+        .map_err(|e| JsError::new(e.message()))
+    // let image_processing = ImageProcess::new(base64_input, None).unwrap();
 
-    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+    // let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
 
-    image_filters::filter_diag(&mut img);
+    // image_filters::filter_diag(&mut img);
 
-    Ok(ImageProcessingResult::new(
-        ImageProcess::dynamic_image_to_byte(&img),
-    ))
+    // Ok(ImageProcessingResult::new(
+    //     ImageProcess::dynamic_image_to_byte(&img),
+    // ))
 }
 
 #[wasm_bindgen]
-pub fn filter_gradient(base64_input: String) -> Result<ImageProcessingResult, JsError> {
-    let image_processing = ImageProcess::new(base64_input, None).unwrap();
+pub fn filter_gradient(base64_input: String, direction: GradientDirection) -> Result<ImageProcessingResult, JsError> {
+    ImageProcess::new(base64_input)?
+        .compute_filter_gradient(
+            ColorRgba::new(0, 128, 0, 0),
+            ColorRgba::new(255, 255, 255, 255),
+            direction,
+        )
+        .map_err(|e| JsError::new(e.message()))
 
-    let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
-    
-    image_filters::filter_gradient(
-        &mut img,
-        ColorRgba::new(0, 128, 0, 0).into(),
-        ColorRgba::new(255, 255, 255, 255).into(),
-        GradientDirection::VERTICAL,
-    );
+    // let image_processing = ImageProcess::new(base64_input, None).unwrap();
 
-    Ok(ImageProcessingResult::new(
-        ImageProcess::dynamic_image_to_byte(&img),
-    ))
+    // let mut img = image::load_from_memory(image_processing.input.as_slice()).unwrap();
+    // image_filters::filter_gradient(
+    //     &mut img,
+    //     ColorRgba::new(0, 128, 0, 0).into(),
+    //     ColorRgba::new(255, 255, 255, 255).into(),
+    //     GradientDirection::VERTICAL,
+    // );
+
+    // Ok(ImageProcessingResult::new(
+    //     ImageProcess::dynamic_image_to_byte(&img),
+    // ))
 }

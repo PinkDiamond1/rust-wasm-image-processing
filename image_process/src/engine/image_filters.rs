@@ -5,17 +5,20 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use super::ErrorCode;
 
 #[wasm_bindgen]
-pub enum FilterType {
-    BASIC_DIAG,
-    GRADIENT,
-    SOBEL,
+#[derive(Debug, Copy, Clone)]
+pub enum FilterPixelType {
+    VERTICAL,
+    HORIZONTAL,
+    DIAGONAL,
+    CIRCLE,
 }
 
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone)]
 pub enum GradientDirection {
     VERTICAL,
     HORIZONTAL,
 }
-
 //Basic Color enum to be instanciate from front
 #[wasm_bindgen]
 #[derive(Debug, Copy, Clone)]
@@ -54,17 +57,17 @@ impl From<Rgba<u8>> for ColorRgba {
     }
 }
 
-pub fn filter_diag(img: &mut DynamicImage) {
+pub fn filter_diag(img: &mut DynamicImage) -> Result<DynamicImage, ErrorCode> {
     filter_base(img, |x, y| {
         if x % 4 == 0 {
             image::Rgba([0 as u8, 0, 0, 100])
         } else {
             image::Rgba([255 as u8, 255, 255, 0])
         }
-    });
+    })
 }
 
-fn filter_base<F>(img: &mut DynamicImage, func: F)
+fn filter_base<F>(img: &mut DynamicImage, func: F) -> Result<DynamicImage, ErrorCode>
 where
     F: FnMut(u32, u32) -> Rgba<u8>,
 {
@@ -79,6 +82,9 @@ where
 
     //And then apply the overlay
     imageops::overlay(img, &filter_dynamic, 0, 0);
+    
+    let edited_imgage = img;
+    Ok(edited_imgage.clone())
 }
 
 pub fn filter_gradient(
@@ -86,7 +92,7 @@ pub fn filter_gradient(
     color_from: Rgba<u8>,
     color_to: Rgba<u8>,
     gradient: GradientDirection,
-) {
+) -> Result<DynamicImage, ErrorCode> {
     let mut img_buf = RgbaImage::new(img.width(), img.height());
 
     match gradient {
@@ -99,22 +105,27 @@ pub fn filter_gradient(
     }
 
     imageops::overlay(img, &img_buf, 0, 0);
+
+    let edited_imgage = img;
+    Ok(edited_imgage.clone())
 }
 
-pub fn filter_sobel(img: &mut DynamicImage) {
+pub fn filter_sobel(mut img: DynamicImage) -> DynamicImage {
     let gray_image: GrayImage = img.to_luma8();
-
     let sobel = imageproc::gradients::sobel_gradients(&gray_image);
-
-    *img = DynamicImage::from(sobel);
+    DynamicImage::from(sobel)
 }
 
-pub fn filter_col_color(img: &mut DynamicImage, colors: Vec<Rgba<u8>>) -> Result<(), ()> {
+pub fn filter_col_color(
+    img: &mut DynamicImage,
+    colors: Vec<Rgba<u8>>,
+) -> Result<DynamicImage, ErrorCode> {
     info!("Filter col color start");
     if colors.len() == 0 {
         info!("No color found, exit");
         //Nothing to do, exit early
-        return Ok(());
+        let edited_imgage = img;
+        return Ok(edited_imgage.clone());
     }
 
     let (w, h) = img.dimensions();
@@ -137,5 +148,7 @@ pub fn filter_col_color(img: &mut DynamicImage, colors: Vec<Rgba<u8>>) -> Result
         //And then apply the overlay
         imageops::overlay(img, &filter_dynamic, pos_x as i64, 0);
     }
-    Ok(())
+
+    let edited_imgage = img;
+    Ok(edited_imgage.clone())
 }
