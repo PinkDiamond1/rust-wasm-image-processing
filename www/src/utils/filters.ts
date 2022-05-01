@@ -14,5 +14,31 @@ export class RangeFilter {
     }
 }
 
+export class CheckboxFilter {
+    id: String;
+    label: String;
+    selected: Boolean;
+
+    constructor(id: String, label: String, selected: Boolean) {
+        this.id = id;
+        this.label = label;
+        this.selected = selected;
+    }
+}
+
+export class ImagePreviewFilter {
+    id: String;
+    label: String;
+    image: String;
+    selected: Boolean;
+
+    constructor(id: String, label: String, image: String, selected: Boolean) {
+        this.id = id;
+        this.label = label;
+        this.image = image;
+        this.selected = selected;
+    }
+}
+
 export default {
 }

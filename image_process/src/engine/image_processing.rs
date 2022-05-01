@@ -4,7 +4,7 @@ use super::{
 };
 use chrono::Local;
 use image::Rgba;
-use image::{DynamicImage, ImageResult};
+use image::{DynamicImage};
 use log::*;
 use std::{fmt::Display, io::Cursor};
 use wasm_bindgen::prelude::*;
@@ -74,6 +74,7 @@ impl ImageParameters {
         }
     }
 
+    /// Perform basic filter on image
     pub fn apply_filter(&self, mut img: DynamicImage) -> DynamicImage {
         if let Some(brighten) = self.brighten {
             img = img.brighten(brighten);
@@ -102,6 +103,11 @@ impl ImageParameters {
             info!("Constrast filter applied : {}", constrast);
         }
 
+        if self.invert.unwrap_or(false) {
+            img.invert();
+            info!("Invert filter applied");
+        }
+
         img
     }
 }
@@ -117,22 +123,12 @@ impl ImageProcess {
         })
     }
 
-    // filter_params : match filter {
-    //     Some(filter) => {
-    //         info!("Filters parameter set");
-    //         filter
-    //     },
-    //     None => {
-    //         info!("Not filter set, use default one");
-    //         ImageParameters::default()
-    //     }
-    // }
-    //Replace the "data:image/jpeg;base64," in the string
+    ///Replace the "data:image/jpeg;base64," in the string
     pub fn parse_base64_input_if_needed(base64_input: &String) -> String {
         str::replace(base64_input.as_str(), "data:image/jpeg;base64,", "")
     }
 
-    //Create a Dynamic image from bytes
+    /// Create a Dynamic image from bytes
     fn get_dynamic_image(&self) -> Result<DynamicImage, ErrorCode> {
         info!("Try to create Dynamic image from byte");
         match image::load_from_memory(&self.input.as_slice()) {
@@ -147,7 +143,7 @@ impl ImageProcess {
         }
     }
 
-    //Dynamic image to bytes
+    /// Convert Dynamic image to bytes
     fn dynamic_image_to_byte(img: &DynamicImage) -> Vec<u8> {
         info!("Convert image to bytes");
         let mut edited_image_bytes = Vec::new();
@@ -160,6 +156,7 @@ impl ImageProcess {
         edited_image_bytes
     }
 
+    /// Save the image on the specific location
     pub fn save_image(img: &DynamicImage, path: &str) -> Option<ErrorCode> {
         let local_date = Local::now();
         let date_string = local_date.format("%Y-%m-%d_%H-%M-%S").to_string();
@@ -187,40 +184,26 @@ impl ImageProcess {
     }
 
     pub fn compute_filter_sobel(&self) -> Result<ImageProcessingResult, ErrorCode> {
-        Ok(ImageProcessingResult::new(
-            ImageProcess::dynamic_image_to_byte(&image_filters::filter_sobel(
+        self.compute_filters(|| {
+            image_filters::filter_sobel(
                 self.get_dynamic_image()?,
-            )),
-        ))
+            )
+        })
     }
 
-    pub fn compute_filter_column_color(
+    pub fn compute_filter_band_color(
         &self,
         colors: Vec<ColorRgba>,
+        direction: GradientDirection
     ) -> Result<ImageProcessingResult, ErrorCode> {
-        Ok(ImageProcessingResult::new(
-            ImageProcess::dynamic_image_to_byte(&image_filters::filter_col_color(
+        self.compute_filters(|| {
+            image_filters::filter_band_color(
                 &mut self.get_dynamic_image()?,
                 colors.iter().map(|c| Rgba::<u8>::from(*c)).collect(),
-            )?),
-        ))
+                direction
+            )
+        })
     }
-
-    // pub fn compute_filter_gradient(
-    //     &self,
-    //     start: ColorRgba,
-    //     to: ColorRgba,
-    //     gradient: GradientDirection,
-    // ) -> Result<ImageProcessingResult, ErrorCode> {
-    //     Ok(ImageProcessingResult::new(
-    //         ImageProcess::dynamic_image_to_byte(&image_filters::filter_gradient(
-    //             &mut self.get_dynamic_image()?,
-    //             start.into(),
-    //             to.into(),
-    //             gradient,
-    //         )?),
-    //     ))
-    // }
 
     pub fn compute_filter_gradient(
         &self,
@@ -236,33 +219,19 @@ impl ImageProcess {
                 gradient,
             )
         })
-        // Ok(ImageProcessingResult::new(
-        //     ImageProcess::dynamic_image_to_byte(&image_filters::filter_gradient(
-        //         &mut self.get_dynamic_image()?,
-        //         start.into(),
-        //         to.into(),
-        //         gradient,
-        //     )?),
-        // ))
     }
 
     pub fn compute_filter_pixel(
         &self,
         pixel_filter: FilterPixelType,
+        color: ColorRgba,
     ) -> Result<ImageProcessingResult, ErrorCode> {
-        Ok(ImageProcessingResult::new(
-            ImageProcess::dynamic_image_to_byte(match pixel_filter {
-                FilterPixelType::VERTICAL => {
-                    &image_filters::filter_diag(&mut self.get_dynamic_image()?)?
-                }
-                _ => {
-                    warn!("Filter not implemented yet");
-                    return Err(ErrorCode::NotImplemented);
-                }
-            }),
-        ))
+        self.compute_filters(|| {
+            image_filters::filter_pixel(&mut self.get_dynamic_image()?, pixel_filter, color)
+        })
     }
 
+    /// Perform the filter function
     fn compute_filters<F>(&self, func: F) -> Result<ImageProcessingResult, ErrorCode>
     where
         F: Fn() -> Result<DynamicImage, ErrorCode>,

@@ -13,7 +13,7 @@ pub enum ErrorCode {
 }
 
 impl ErrorCode {
-    //Message to be display in the front end
+    //Message to be display in front end
     pub fn message(&self) -> &str {
         match self {
             Self::InvalidParsing => "Invalid parsing",

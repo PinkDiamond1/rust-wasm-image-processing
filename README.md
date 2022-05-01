@@ -1,15 +1,13 @@
-# Template for Rust WASM with Vite JS
+# Rust WebAssembly image processing with Vue JS
 
-Template for :
-* Vanilla JS
-* Vue 3
-* React
+A simple Rust and VueJS project to train with webassembly.
+It's a POC application to allow some image processing (based on https://crates.io/crates/image crate).
+It can perform some basic filter (huerotate / brightness etc) and some custom filters.
 
-To start, choose the template you want to use and run these command (example with react) :
+To start the project follow these steps :
 ```
-cd www-react
+cd www
 npm install
 npm run wasm
-npm run build
 npm run dev
 ```

@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import { RangeFilter } from '../utils/filters';
+import { RangeFilter } from '../../utils/filters';
 
 export default {
     props: {

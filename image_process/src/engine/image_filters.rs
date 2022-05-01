@@ -29,7 +29,9 @@ pub struct ColorRgba {
     pub alpha: u8,
 }
 
+#[wasm_bindgen]
 impl ColorRgba {
+    #[wasm_bindgen(constructor)]
     pub fn new(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         Self {
             red,
@@ -57,16 +59,17 @@ impl From<Rgba<u8>> for ColorRgba {
     }
 }
 
-pub fn filter_diag(img: &mut DynamicImage) -> Result<DynamicImage, ErrorCode> {
+pub fn filter_pixel(img: &mut DynamicImage, pixelType: FilterPixelType, color: ColorRgba) -> Result<DynamicImage, ErrorCode> {
     filter_base(img, |x, y| {
         if x % 4 == 0 {
-            image::Rgba([0 as u8, 0, 0, 100])
+            color.into()
         } else {
             image::Rgba([255 as u8, 255, 255, 0])
         }
     })
 }
 
+/// Apply the filter function in parameter
 fn filter_base<F>(img: &mut DynamicImage, func: F) -> Result<DynamicImage, ErrorCode>
 where
     F: FnMut(u32, u32) -> Rgba<u8>,
@@ -82,9 +85,8 @@ where
 
     //And then apply the overlay
     imageops::overlay(img, &filter_dynamic, 0, 0);
-    
-    let edited_imgage = img;
-    Ok(edited_imgage.clone())
+
+    Ok(img.to_owned())
 }
 
 pub fn filter_gradient(
@@ -106,19 +108,19 @@ pub fn filter_gradient(
 
     imageops::overlay(img, &img_buf, 0, 0);
 
-    let edited_imgage = img;
-    Ok(edited_imgage.clone())
+    Ok(img.to_owned())
 }
 
-pub fn filter_sobel(mut img: DynamicImage) -> DynamicImage {
+pub fn filter_sobel(img: DynamicImage) -> Result<DynamicImage, ErrorCode> {
     let gray_image: GrayImage = img.to_luma8();
     let sobel = imageproc::gradients::sobel_gradients(&gray_image);
-    DynamicImage::from(sobel)
+    Ok(DynamicImage::from(sobel))
 }
 
-pub fn filter_col_color(
+pub fn filter_band_color(
     img: &mut DynamicImage,
     colors: Vec<Rgba<u8>>,
+    direction: GradientDirection
 ) -> Result<DynamicImage, ErrorCode> {
     info!("Filter col color start");
     if colors.len() == 0 {
@@ -129,26 +131,53 @@ pub fn filter_col_color(
     }
 
     let (w, h) = img.dimensions();
-    let col_dimension: usize = w as usize / colors.len();
+
+
+    match direction {
+        GradientDirection::VERTICAL => {
+            let col_dimension: usize = w as usize / colors.len();
     info!(
-        "Image dimension = {}*{} - {} colors to be apply - {}px by band",
+        "Image dimension = {}*{} - {} colors to be apply - {}px by vertical band",
         w,
         h,
         colors.len(),
         col_dimension
     );
 
-    for (i, color) in colors.into_iter().enumerate() {
-        let pos_x: u32 = (i * col_dimension) as u32;
-        info!("Loop col color - pos_x = {} - color = {:?}", pos_x, color);
+            for (i, color) in colors.into_iter().enumerate() {
+                let pos_x: u32 = (i * col_dimension) as u32;
+                info!("Loop col color - pos_x = {} - color = {:?}", pos_x, color);
 
-        let filter = ImageBuffer::from_pixel(pos_x, h, color);
-        let filter_dynamic = DynamicImage::ImageRgba8(filter);
+                let filter = ImageBuffer::from_pixel(pos_x, h, color);
+                let filter_dynamic = DynamicImage::ImageRgba8(filter);
 
-        //And then apply the overlay
-        imageops::overlay(img, &filter_dynamic, pos_x as i64, 0);
+                //And then apply the overlay
+                imageops::overlay(img, &filter_dynamic, pos_x as i64, 0);
+            }
+        },
+        GradientDirection::HORIZONTAL => {
+            let row_dimension: usize = h as usize / colors.len();
+            info!(
+                "Image dimension = {}*{} - {} colors to be apply - {}px by horizontal band",
+                w,
+                h,
+                colors.len(),
+                row_dimension
+            );
+
+            for (i, color) in colors.into_iter().enumerate() {
+                let pos_y: u32 = (i * row_dimension) as u32;
+                info!("Loop col color - pos_x = {} - color = {:?}", pos_y, color);
+
+                let filter = ImageBuffer::from_pixel(pos_y, h, color);
+                let filter_dynamic = DynamicImage::ImageRgba8(filter);
+
+                //And then apply the overlay
+                imageops::overlay(img, &filter_dynamic, pos_y as i64, 0);
+            }
+        }
     }
 
-    let edited_imgage = img;
-    Ok(edited_imgage.clone())
+
+    Ok(img.to_owned())
 }
