@@ -3,7 +3,7 @@ use super::{
     ErrorCode, ImageProcessingResult,
 };
 use chrono::Local;
-use image::Rgba;
+use image::{Rgba, imageops};
 use image::{DynamicImage};
 use log::*;
 use std::{fmt::Display, io::Cursor};
@@ -239,6 +239,36 @@ impl ImageProcess {
         Ok(ImageProcessingResult::new(
             ImageProcess::dynamic_image_to_byte(&func()?),
         ))
+    }
+
+    pub fn resize(&self, width: usize, height: usize) -> Result<ImageProcessingResult, ErrorCode> {
+        Ok(ImageProcessingResult::new(
+            ImageProcess::dynamic_image_to_byte(&self.get_dynamic_image()?.resize(
+                width as u32,
+                height as u32,
+                imageops::FilterType::Lanczos3,
+            )),
+        ))
+    }
+
+    /// Return the bytes size of the base64 image
+    /// Formula : x = (n * (3/4)) - y
+    ///     1. x is the size of a file in bytes
+    ///     2. n is the length of the Base64 String
+    ///     3. y will be 2 if Base64 ends with '==' and 1 if Base64 ends with '='.
+    pub fn get_image_byte_size(base64_input: String) -> Result<usize, ErrorCode> {
+        let n = base64_input.len();
+        let y = if base64_input.ends_with("==") { 1 } else { 2 };
+
+        if n == 0 || base64_input.is_empty() {
+            return Err(ErrorCode::ImageEmpty);
+        }
+
+        Ok((n * (3 / 4)) - y)
+    }
+
+    pub fn calc_best_size_ratio(base64_input: String) -> Result<usize, ErrorCode> {
+        todo!()
     }
 }
 

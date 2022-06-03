@@ -9,7 +9,8 @@ pub enum ErrorCode {
     InvalidParsing,
     UnableToSave,
     NoColorInput,
-    NotImplemented
+    NotImplemented,
+    ImageEmpty
 }
 
 impl ErrorCode {
@@ -21,6 +22,7 @@ impl ErrorCode {
             Self::UnableToSave => "Unable to save",
             Self::NoColorInput => "No color to apply for filter",
             Self::NotImplemented => "Not implemented yet",
+            Self::ImageEmpty => "The image is empty",
         }
     }
 }

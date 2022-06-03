@@ -8,6 +8,8 @@ use wasm_bindgen::prelude::*;
 
 pub mod engine;
 
+// https://github.com/umgefahren/image-comp-lib-rust
+
 cfg_if! {
     if #[cfg(feature = "console_log")] {
         fn init_log() {
@@ -29,6 +31,18 @@ pub fn main() {
 }
 
 /// Perform basic filter like Brighteness, huerotate, contrast etc
+#[wasm_bindgen]
+pub fn image_resize(
+    base64_input: String,
+    width: usize,
+    height: usize,
+) -> Result<ImageProcessingResult, JsError> {
+    let image_processing = ImageProcess::new(base64_input)?;
+    image_processing
+        .resize(width, height)
+        .map_err(|e| JsError::new(e.message()))
+}
+
 #[wasm_bindgen]
 pub fn filter_params(
     base64_input: String,
