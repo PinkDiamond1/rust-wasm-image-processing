@@ -1,10 +1,11 @@
 use super::{
     image_filters::{self, ColorRgba, FilterPixelType, GradientDirection},
-    ErrorCode, ImageProcessingResult,
+    ErrorCode, ImageProcessingResult, image_processing_result::ImageDimension,
 };
 use chrono::Local;
 use image::{Rgba, imageops};
 use image::{DynamicImage};
+use imageproc::drawing::Canvas;
 use log::*;
 use std::{fmt::Display, io::Cursor};
 use wasm_bindgen::prelude::*;
@@ -33,6 +34,12 @@ impl InputType for String {
 impl InputType for Vec<u8> {
     fn to_byte(&self) -> Result<Vec<u8>, ErrorCode> {
         Ok(self.to_vec())
+    }
+}
+
+impl InputType for ImageProcessingResult {
+    fn to_byte(&self) -> Result<Vec<u8>, ErrorCode> {
+        Ok(self.to_byte())
     }
 }
 
@@ -141,6 +148,19 @@ impl ImageProcess {
                 Err(ErrorCode::UnableToDecode)
             }
         }
+    }
+
+    pub fn get_image(&self) -> Vec<u8> {
+        self.input.clone()
+    }
+
+    pub fn get_image_base64(&self) -> String {
+        base64::encode(&self.input)
+    }
+
+    pub fn get_image_dimension(&self) -> Result<ImageDimension, ErrorCode> {
+        let d = self.get_dynamic_image()?.dimensions();
+        Ok(ImageDimension::new(d.0, d.1))
     }
 
     /// Convert Dynamic image to bytes
@@ -256,19 +276,40 @@ impl ImageProcess {
     ///     1. x is the size of a file in bytes
     ///     2. n is the length of the Base64 String
     ///     3. y will be 2 if Base64 ends with '==' and 1 if Base64 ends with '='.
-    pub fn get_image_byte_size(base64_input: String) -> Result<usize, ErrorCode> {
-        let n = base64_input.len();
-        let y = if base64_input.ends_with("==") { 1 } else { 2 };
+    pub fn get_image_weight_byte(base64_input: String) -> Result<usize, ErrorCode> {
+        let clean_base64 = ImageProcess::parse_base64_input_if_needed(&base64_input);
+        let length = clean_base64.len();
+        let output_padding = if clean_base64.ends_with("==") { 1 } else if clean_base64.ends_with("=") { 2 } else { 0 };
 
-        if n == 0 || base64_input.is_empty() {
+        info!("base64 after clean [{}...{}]", &clean_base64[0..20], &clean_base64[(clean_base64.len() - 20)..]);
+        info!("base64_input length = {}", length);
+        info!("output_padding = {}", output_padding);
+
+        if length == 0 || clean_base64.is_empty() {
             return Err(ErrorCode::ImageEmpty);
         }
 
-        Ok((n * (3 / 4)) - y)
+        // let x = length as f64 * (3 as f64 / 4 as f64);
+        // info!("length * (3 / 4) {}", x);
+        // info!("length * (3 / 4) - output_padding = {}", x as usize - output_padding);
+        let size_in_byte = (length as f64 * (3 as f64 / 4 as f64)) as usize - output_padding;
+        info!("\nImage size : {} bytes", size_in_byte);
+        Ok(size_in_byte)
     }
 
-    pub fn calc_best_size_ratio(base64_input: String) -> Result<usize, ErrorCode> {
-        todo!()
+    /// We try to have an image < 200 kbytes
+    pub fn calc_best_size_ratio(base64_input: String, target_size: usize) -> Result<ImageProcessingResult, ErrorCode> {
+        let mut img = ImageProcess::new(base64_input)?;
+
+        while ImageProcess::get_image_weight_byte(img.get_image_base64())? < target_size {
+            let (width, height) = img.get_dynamic_image()?.dimensions();
+            let result = img.resize((width * 80 / 100) as usize, (height * 80 / 100) as usize)?;
+
+            img = ImageProcess::new(result)?;
+        }
+        Ok(ImageProcessingResult::new(
+            ImageProcess::dynamic_image_to_byte(&img.get_dynamic_image()?),
+        ))
     }
 }
 

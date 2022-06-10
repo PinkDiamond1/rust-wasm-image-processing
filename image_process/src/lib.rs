@@ -1,4 +1,4 @@
-use crate::engine::ImageProcessingResult;
+use crate::engine::{ImageProcessingResult, ImageDimension};
 use cfg_if::cfg_if;
 use engine::image_filters::GradientDirection;
 use engine::{image_filters::ColorRgba, ImageParameters, ImageProcess};
@@ -43,6 +43,22 @@ pub fn image_resize(
         .map_err(|e| JsError::new(e.message()))
 }
 
+/// Perform basic filter like Brighteness, huerotate, contrast etc
+#[wasm_bindgen]
+pub fn image_weight(base64_input: String) -> Result<usize, JsError> {
+    ImageProcess::get_image_weight_byte(base64_input).map_err(|e| JsError::new(e.message()))
+}
+
+#[wasm_bindgen]
+pub fn image_dimension(base64_input: String) -> Result<ImageDimension, JsError> {
+    ImageProcess::new(base64_input)?.get_image_dimension().map_err(|e| JsError::new(e.message()))
+}
+
+#[wasm_bindgen]
+pub fn calc_best_size_ratio(base64_input: String, target_size: usize) -> Result<ImageProcessingResult, JsError> {
+    ImageProcess::calc_best_size_ratio(base64_input, target_size).map_err(|e| JsError::new(e.message()))
+}
+
 #[wasm_bindgen]
 pub fn filter_params(
     base64_input: String,
@@ -64,22 +80,31 @@ pub fn filter_sobel(base64_input: String) -> Result<ImageProcessingResult, JsErr
 
 /// Perform a filter with colored band (vertical or horizontal)
 #[wasm_bindgen]
-pub fn filter_overlay_color(base64_input: String, direction: GradientDirection) -> Result<ImageProcessingResult, JsError> {
+pub fn filter_overlay_color(
+    base64_input: String,
+    direction: GradientDirection,
+) -> Result<ImageProcessingResult, JsError> {
     ImageProcess::new(base64_input)?
-        .compute_filter_band_color(vec![
-            ColorRgba::new(214, 110, 250, 150),
-            ColorRgba::new(155, 100, 220, 150),
-            ColorRgba::new(150, 120, 240, 150),
-            ColorRgba::new(95, 105, 220, 150),
-            ColorRgba::new(110, 150, 250, 160),
-        ],
-        direction)
+        .compute_filter_band_color(
+            vec![
+                ColorRgba::new(214, 110, 250, 150),
+                ColorRgba::new(155, 100, 220, 150),
+                ColorRgba::new(150, 120, 240, 150),
+                ColorRgba::new(95, 105, 220, 150),
+                ColorRgba::new(110, 150, 250, 160),
+            ],
+            direction,
+        )
         .map_err(|e| JsError::new(e.message()))
 }
 
 /// Perform basic filter with lines of pixel drawn on the top of the image
 #[wasm_bindgen]
-pub fn filter_pixel(base64_input: String, pixel_type: engine::image_filters::FilterPixelType, color: ColorRgba) -> Result<ImageProcessingResult, JsError> {
+pub fn filter_pixel(
+    base64_input: String,
+    pixel_type: engine::image_filters::FilterPixelType,
+    color: ColorRgba,
+) -> Result<ImageProcessingResult, JsError> {
     ImageProcess::new(base64_input)?
         .compute_filter_pixel(pixel_type, color)
         .map_err(|e| JsError::new(e.message()))
@@ -87,12 +112,13 @@ pub fn filter_pixel(base64_input: String, pixel_type: engine::image_filters::Fil
 
 /// Perform a vertical or horizontal linear gradient
 #[wasm_bindgen]
-pub fn filter_gradient(base64_input: String, direction: GradientDirection, from: ColorRgba, to: ColorRgba) -> Result<ImageProcessingResult, JsError> {
+pub fn filter_gradient(
+    base64_input: String,
+    direction: GradientDirection,
+    from: ColorRgba,
+    to: ColorRgba,
+) -> Result<ImageProcessingResult, JsError> {
     ImageProcess::new(base64_input)?
-        .compute_filter_gradient(
-            from,
-            to,
-            direction,
-        )
+        .compute_filter_gradient(from, to, direction)
         .map_err(|e| JsError::new(e.message()))
 }

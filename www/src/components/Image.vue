@@ -90,6 +90,13 @@
           <div class="flex justify-center">
             <img style="" :src="image" alt="" />
           </div>
+          <div v-if="false" class="bg-gradient-to-red-400 from-red to-red-700">
+            Image ({{ imageWidth }}x{{ imageHeight }}) - {{ imageSize }} kb <br />
+            Do you want to reduce it to ({{ imageWidth }}x{{ imageHeight }}) - {{ imageSize }} kb <br />
+            to improve filter processing ?
+            <button type="button">Yes</button>
+            <button type="button">No</button>
+          </div>
         </div>
 
         <!-- Filters -->
@@ -127,6 +134,8 @@ import Filter from "./Filter.vue";
 
 await init();
 
+const IMAGE_MAX_WEIGHT = 200000;
+
 export default {
   components: { Filter },
   data() {
@@ -135,6 +144,16 @@ export default {
       image: null,
       imageEdit: null,
       imageTest: null,
+      imageSettings: {
+        imageExceedSize: false,
+        imageWidth: null,
+        imageHeight: null,
+        imageWeight: null,
+        newImageWidth: null,
+        newImageHeight: null,
+        newImageWeight: null
+      }
+
     };
   },
   methods: {
@@ -195,6 +214,25 @@ export default {
       reader.onload = (e) => {
         this.image = e.target.result;
         this.onFilterParamsChanged(null);
+
+        //Check image length
+        let image_length = img.image_weight(this.image);
+        console.log("Check image length");
+        if(image_length > IMAGE_MAX_WEIGHT) {
+          this.imageSettings.imageExceedSize = true;
+          let dimensions = img.image_dimension(this.image);
+          console.log("Width: " + dimensions.get_width() + " - Height: " + dimensions.get_height());
+          let newImage = img.calc_best_size_ratio(this.image, IMAGE_MAX_WEIGHT);
+          let newImageDimension = img.image_dimension(newImage.to_base64());
+          console.log("Width: " + newImageDimension.get_width() + " - Height: " + newImageDimension.get_height());
+          console.log("New image weight : " + img.image_weight(newImage.to_base64()));
+        //   imageWidth: null,
+        // imageHeight: null,
+        // imageWeight: null,
+        // newImageWidth: null,
+        // newImageHeight: null,
+        // newImageWeight: null
+        }
       };
 
       reader.readAsDataURL(fileObject);

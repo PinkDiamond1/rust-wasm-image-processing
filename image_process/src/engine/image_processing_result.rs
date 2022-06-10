@@ -23,3 +23,24 @@ impl ImageProcessingResult {
         ImageProcessingResult { result }
     }
 }
+
+#[wasm_bindgen]
+pub struct ImageDimension {
+    width: usize,
+    height: usize
+}
+
+#[wasm_bindgen]
+impl ImageDimension {
+    pub fn new(width: u32, height: u32) -> ImageDimension {
+        ImageDimension { width: width as usize, height: height as usize }
+    }
+
+    pub fn get_width(&self) -> usize {
+        self.width
+    }
+
+    pub fn get_height(&self) -> usize {
+        self.height
+    }
+}
