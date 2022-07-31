@@ -134,7 +134,7 @@ import Filter from "./Filter.vue";
 
 await init();
 
-const IMAGE_MAX_WEIGHT = 200000;
+const IMAGE_MAX_WEIGHT = 20000;
 
 export default {
   components: { Filter },
@@ -217,12 +217,15 @@ export default {
 
         //Check image length
         let image_length = img.image_weight(this.image);
-        console.log("Check image length");
         if(image_length > IMAGE_MAX_WEIGHT) {
+          console.log("Image length exceed max height");
           this.imageSettings.imageExceedSize = true;
           let dimensions = img.image_dimension(this.image);
           console.log("Width: " + dimensions.get_width() + " - Height: " + dimensions.get_height());
+
+          console.log("Start calc best size ratio");
           let newImage = img.calc_best_size_ratio(this.image, IMAGE_MAX_WEIGHT);
+          console.log("End calc best size ratio");
           let newImageDimension = img.image_dimension(newImage.to_base64());
           console.log("Width: " + newImageDimension.get_width() + " - Height: " + newImageDimension.get_height());
           console.log("New image weight : " + img.image_weight(newImage.to_base64()));

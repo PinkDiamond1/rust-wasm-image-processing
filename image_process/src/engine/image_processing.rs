@@ -19,7 +19,7 @@ impl InputType for String {
     fn to_byte(&self) -> Result<Vec<u8>, ErrorCode> {
         match base64::decode(ImageProcess::parse_base64_input_if_needed(&self)) {
             Ok(img_bytes) => {
-                info!("Convert Vec<u8> byte from base64 image");
+                trace!("Convert Vec<u8> byte from base64 image");
                 return Ok(img_bytes);
             }
             Err(e) => {
@@ -85,34 +85,34 @@ impl ImageParameters {
     pub fn apply_filter(&self, mut img: DynamicImage) -> DynamicImage {
         if let Some(brighten) = self.brighten {
             img = img.brighten(brighten);
-            info!("Brighten filter applied : {}", brighten);
+            trace!("Brighten filter applied : {}", brighten);
         }
 
         if let Some(blur) = self.blur {
             img = img.blur(blur);
-            info!("Blur filter applied : {}", blur);
+            trace!("Blur filter applied : {}", blur);
         }
 
         if let Some(hue) = self.hue {
             img = img.huerotate(hue);
-            info!("Huerotate filter applied : {}", hue);
+            trace!("Huerotate filter applied : {}", hue);
         }
 
         if let Some(b) = self.grayscale {
             if b {
                 img = img.grayscale();
-                info!("Grayscale filter applied");
+                trace!("Grayscale filter applied");
             }
         }
 
         if let Some(constrast) = self.constrast {
             img = img.adjust_contrast(constrast);
-            info!("Constrast filter applied : {}", constrast);
+            trace!("Constrast filter applied : {}", constrast);
         }
 
         if self.invert.unwrap_or(false) {
             img.invert();
-            info!("Invert filter applied");
+            trace!("Invert filter applied");
         }
 
         img
@@ -124,7 +124,7 @@ impl ImageProcess {
     where
         T: InputType,
     {
-        info!("New ImageProcess instance");
+        trace!("New ImageProcess instance");
         Ok(ImageProcess {
             input: input.to_byte()?,
         })
@@ -132,15 +132,15 @@ impl ImageProcess {
 
     ///Replace the "data:image/jpeg;base64," in the string
     pub fn parse_base64_input_if_needed(base64_input: &String) -> String {
-        str::replace(base64_input.as_str(), "data:image/jpeg;base64,", "")
+        str::replace(base64_input.as_str(), "data:image/png;base64,", "")
     }
 
     /// Create a Dynamic image from bytes
     fn get_dynamic_image(&self) -> Result<DynamicImage, ErrorCode> {
-        info!("Try to create Dynamic image from byte");
+        trace!("Try to create Dynamic image from byte");
         match image::load_from_memory(&self.input.as_slice()) {
             Ok(dynamic_image) => {
-                info!("Dynamic image instance created");
+                trace!("Dynamic image instance created");
                 Ok(dynamic_image)
             }
             Err(e) => {
@@ -150,11 +150,11 @@ impl ImageProcess {
         }
     }
 
-    pub fn get_image(&self) -> Vec<u8> {
+    pub fn as_byte(&self) -> Vec<u8> {
         self.input.clone()
     }
 
-    pub fn get_image_base64(&self) -> String {
+    pub fn to_base64(&self) -> String {
         base64::encode(&self.input)
     }
 
@@ -165,7 +165,7 @@ impl ImageProcess {
 
     /// Convert Dynamic image to bytes
     fn dynamic_image_to_byte(img: &DynamicImage) -> Vec<u8> {
-        info!("Convert image to bytes");
+        trace!("Convert image to bytes");
         let mut edited_image_bytes = Vec::new();
         img.write_to(
             &mut Cursor::new(&mut edited_image_bytes),
@@ -261,11 +261,11 @@ impl ImageProcess {
         ))
     }
 
-    pub fn resize(&self, width: usize, height: usize) -> Result<ImageProcessingResult, ErrorCode> {
+    pub fn resize(&self, width: u32, height: u32) -> Result<ImageProcessingResult, ErrorCode> {
         Ok(ImageProcessingResult::new(
             ImageProcess::dynamic_image_to_byte(&self.get_dynamic_image()?.resize(
-                width as u32,
-                height as u32,
+                width,
+                height,
                 imageops::FilterType::Lanczos3,
             )),
         ))
@@ -281,31 +281,37 @@ impl ImageProcess {
         let length = clean_base64.len();
         let output_padding = if clean_base64.ends_with("==") { 1 } else if clean_base64.ends_with("=") { 2 } else { 0 };
 
-        info!("base64 after clean [{}...{}]", &clean_base64[0..20], &clean_base64[(clean_base64.len() - 20)..]);
-        info!("base64_input length = {}", length);
-        info!("output_padding = {}", output_padding);
+        trace!("base64 image [{}...{}]", &clean_base64[0..20], &clean_base64[(clean_base64.len() - 20)..]);
+        trace!("base64 length = {}", length);
+        trace!("output_padding = {}", output_padding);
 
         if length == 0 || clean_base64.is_empty() {
             return Err(ErrorCode::ImageEmpty);
         }
 
-        // let x = length as f64 * (3 as f64 / 4 as f64);
-        // info!("length * (3 / 4) {}", x);
-        // info!("length * (3 / 4) - output_padding = {}", x as usize - output_padding);
         let size_in_byte = (length as f64 * (3 as f64 / 4 as f64)) as usize - output_padding;
-        info!("\nImage size : {} bytes", size_in_byte);
+        trace!("\nImage size : {} bytes", size_in_byte);
         Ok(size_in_byte)
     }
 
     /// We try to have an image < 200 kbytes
     pub fn calc_best_size_ratio(base64_input: String, target_size: usize) -> Result<ImageProcessingResult, ErrorCode> {
+
         let mut img = ImageProcess::new(base64_input)?;
 
-        while ImageProcess::get_image_weight_byte(img.get_image_base64())? < target_size {
+        let mut image_size = ImageProcess::get_image_weight_byte(img.to_base64())?;
+        info!("Image_size = {} (target size = {})", image_size, target_size);
+
+        while image_size > target_size {
             let (width, height) = img.get_dynamic_image()?.dimensions();
-            let result = img.resize((width * 80 / 100) as usize, (height * 80 / 100) as usize)?;
+            let (new_width, new_height) = ((width * 90 / 100), (height * 90 / 100));
+            // info!("[Calc best size ratio] Image size = {} | Image dimension = {}x{} | New image dimension = {}x{}", image_size, width, height, new_width, new_height);
+
+            let result = img.resize(new_width, new_height)?;
 
             img = ImageProcess::new(result)?;
+
+            image_size = ImageProcess::get_image_weight_byte(img.to_base64())?;
         }
         Ok(ImageProcessingResult::new(
             ImageProcess::dynamic_image_to_byte(&img.get_dynamic_image()?),

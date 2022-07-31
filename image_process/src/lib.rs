@@ -39,7 +39,7 @@ pub fn image_resize(
 ) -> Result<ImageProcessingResult, JsError> {
     let image_processing = ImageProcess::new(base64_input)?;
     image_processing
-        .resize(width, height)
+        .resize(width as u32, height as u32)
         .map_err(|e| JsError::new(e.message()))
 }
 
